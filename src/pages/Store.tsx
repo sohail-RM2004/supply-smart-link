@@ -2,16 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Package, TrendingUp, AlertTriangle, ArrowDown } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-
-interface InventoryItem {
-  sku: string;
-  name: string;
-  current_stock: number;
-  min_threshold: number;
-  max_capacity: number;
-  category: string;
-}
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useInventory } from '../hooks/useInventory';
+import { useLocations } from '../hooks/useLocations';
 
 interface ForecastData {
   date: string;
@@ -21,48 +14,15 @@ interface ForecastData {
 
 const Store: React.FC = () => {
   const { storeId } = useParams();
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const { inventory, loading } = useInventory(storeId, 'store');
+  const { stores } = useLocations();
   const [forecast, setForecast] = useState<ForecastData[]>([]);
   const [inboundTransfers, setInboundTransfers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  // Mock data for demonstration
+  const currentStore = stores.find(s => s.id === storeId);
+
+  // Mock forecast data for now - this would come from demand_forecasts table
   useEffect(() => {
-    const mockInventory: InventoryItem[] = [
-      {
-        sku: 'ELEC-001',
-        name: 'Smartphone XYZ',
-        current_stock: 15,
-        min_threshold: 10,
-        max_capacity: 100,
-        category: 'Electronics'
-      },
-      {
-        sku: 'CLTH-002',
-        name: 'Winter Jacket',
-        current_stock: 5,
-        min_threshold: 15,
-        max_capacity: 50,
-        category: 'Clothing'
-      },
-      {
-        sku: 'GROC-003',
-        name: 'Organic Milk',
-        current_stock: 25,
-        min_threshold: 20,
-        max_capacity: 100,
-        category: 'Groceries'
-      },
-      {
-        sku: 'HOME-004',
-        name: 'Garden Hose',
-        current_stock: 8,
-        min_threshold: 5,
-        max_capacity: 30,
-        category: 'Home & Garden'
-      }
-    ];
-
     const mockForecast: ForecastData[] = [
       { date: '2024-01-16', predicted_demand: 12, actual_demand: 10 },
       { date: '2024-01-17', predicted_demand: 15, actual_demand: 14 },
@@ -92,19 +52,15 @@ const Store: React.FC = () => {
       }
     ];
 
-    setTimeout(() => {
-      setInventory(mockInventory);
-      setForecast(mockForecast);
-      setInboundTransfers(mockTransfers);
-      setLoading(false);
-    }, 1000);
+    setForecast(mockForecast);
+    setInboundTransfers(mockTransfers);
   }, [storeId]);
 
   const getLowStockItems = () => {
     return inventory.filter(item => item.current_stock <= item.min_threshold);
   };
 
-  const getStockLevel = (item: InventoryItem) => {
+  const getStockLevel = (item: any) => {
     const percentage = (item.current_stock / item.max_capacity) * 100;
     if (percentage <= 20) return { color: 'bg-red-500', text: 'Critical' };
     if (percentage <= 50) return { color: 'bg-yellow-500', text: 'Low' };
@@ -123,8 +79,12 @@ const Store: React.FC = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Store {storeId}</h1>
-        <p className="text-gray-600">Inventory Management & Demand Forecasting</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          {currentStore?.name || `Store ${storeId}`}
+        </h1>
+        <p className="text-gray-600">
+          {currentStore?.location} • Inventory Management & Demand Forecasting
+        </p>
       </div>
 
       {/* Stats Overview */}
@@ -222,12 +182,12 @@ const Store: React.FC = () => {
               {inventory.map((item) => {
                 const stockLevel = getStockLevel(item);
                 return (
-                  <tr key={item.sku}>
+                  <tr key={item.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {item.sku}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {item.name}
+                      {item.product_name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {item.current_stock} / {item.max_capacity}

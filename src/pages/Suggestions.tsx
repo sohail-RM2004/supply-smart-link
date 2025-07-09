@@ -1,104 +1,40 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle, XCircle, Clock, AlertCircle, Filter } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface Suggestion {
-  id: string;
-  message: string;
-  from_location: string;
-  to_location: string;
-  sku: string;
-  quantity: number;
-  status: 'pending' | 'approved' | 'rejected';
-  priority: 'high' | 'medium' | 'low';
-  created_at: string;
-  suggested_by: 'ai' | 'manual';
-}
+import { useSuggestions } from '../hooks/useSuggestions';
+import { useLocations } from '../hooks/useLocations';
 
 const Suggestions: React.FC = () => {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const { suggestions, loading, updateSuggestionStatus } = useSuggestions();
+  const { stores, warehouses } = useLocations();
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
-  const [loading, setLoading] = useState(true);
-
-  // Mock data for demonstration
-  useEffect(() => {
-    const mockSuggestions: Suggestion[] = [
-      {
-        id: '1',
-        message: 'Transfer electronics to meet expected demand surge',
-        from_location: 'Warehouse A',
-        to_location: 'Store B',
-        sku: 'ELEC-001',
-        quantity: 25,
-        status: 'pending',
-        priority: 'high',
-        created_at: '2024-01-15T10:30:00Z',
-        suggested_by: 'ai'
-      },
-      {
-        id: '2',
-        message: 'Restock groceries before weekend rush',
-        from_location: 'Central Warehouse',
-        to_location: 'Store C',
-        sku: 'GROC-045',
-        quantity: 100,
-        status: 'approved',
-        priority: 'medium',
-        created_at: '2024-01-15T09:15:00Z',
-        suggested_by: 'ai'
-      },
-      {
-        id: '3',
-        message: 'Move seasonal items to high-traffic location',
-        from_location: 'Warehouse B',
-        to_location: 'Store A',
-        sku: 'SEAS-123',
-        quantity: 50,
-        status: 'rejected',
-        priority: 'low',
-        created_at: '2024-01-14T16:45:00Z',
-        suggested_by: 'manual'
-      },
-      {
-        id: '4',
-        message: 'Emergency restock due to supply chain disruption',
-        from_location: 'Backup Warehouse',
-        to_location: 'Store D',
-        sku: 'EMRG-789',
-        quantity: 75,
-        status: 'pending',
-        priority: 'high',
-        created_at: '2024-01-15T14:20:00Z',
-        suggested_by: 'ai'
-      }
-    ];
-
-    setTimeout(() => {
-      setSuggestions(mockSuggestions);
-      setLoading(false);
-    }, 1000);
-  }, []);
 
   const handleApprove = async (id: string) => {
-    try {
-      setSuggestions(prev => 
-        prev.map(s => s.id === id ? { ...s, status: 'approved' as const } : s)
-      );
+    const success = await updateSuggestionStatus(id, 'approved');
+    if (success) {
       toast.success('Suggestion approved successfully');
-    } catch (error) {
+    } else {
       toast.error('Failed to approve suggestion');
     }
   };
 
   const handleReject = async (id: string) => {
-    try {
-      setSuggestions(prev => 
-        prev.map(s => s.id === id ? { ...s, status: 'rejected' as const } : s)
-      );
+    const success = await updateSuggestionStatus(id, 'rejected');
+    if (success) {
       toast.success('Suggestion rejected');
-    } catch (error) {
+    } else {
       toast.error('Failed to reject suggestion');
+    }
+  };
+
+  const getLocationName = (locationId: string, locationType: 'store' | 'warehouse') => {
+    if (locationType === 'store') {
+      const store = stores.find(s => s.id === locationId);
+      return store?.name || 'Unknown Store';
+    } else {
+      const warehouse = warehouses.find(w => w.id === locationId);
+      return warehouse?.name || 'Unknown Warehouse';
     }
   };
 
@@ -212,6 +148,11 @@ const Suggestions: React.FC = () => {
                   <span className="text-xs text-gray-500">
                     {suggestion.suggested_by === 'ai' ? '🤖 AI Suggested' : '👤 Manual'}
                   </span>
+                  {suggestion.confidence_score && (
+                    <span className="text-xs text-gray-500">
+                      Confidence: {Math.round(suggestion.confidence_score * 100)}%
+                    </span>
+                  )}
                 </div>
                 
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -220,10 +161,10 @@ const Suggestions: React.FC = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
                   <div>
-                    <span className="font-medium">From:</span> {suggestion.from_location}
+                    <span className="font-medium">From:</span> {getLocationName(suggestion.from_location_id, suggestion.from_location_type)}
                   </div>
                   <div>
-                    <span className="font-medium">To:</span> {suggestion.to_location}
+                    <span className="font-medium">To:</span> {getLocationName(suggestion.to_location_id, suggestion.to_location_type)}
                   </div>
                   <div>
                     <span className="font-medium">SKU:</span> {suggestion.sku}
@@ -235,6 +176,14 @@ const Suggestions: React.FC = () => {
                     <span className="font-medium">Created:</span> {new Date(suggestion.created_at).toLocaleDateString()}
                   </div>
                 </div>
+
+                {suggestion.reasoning && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">Reasoning:</span> {suggestion.reasoning}
+                    </p>
+                  </div>
+                )}
               </div>
               
               {suggestion.status === 'pending' && (

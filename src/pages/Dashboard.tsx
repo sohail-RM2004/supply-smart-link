@@ -11,6 +11,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useSuggestions } from '../hooks/useSuggestions';
+import { useInventory } from '../hooks/useInventory';
 
 interface DashboardStats {
   totalStockAlerts: number;
@@ -21,6 +23,8 @@ interface DashboardStats {
 
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
+  const { suggestions } = useSuggestions();
+  const { inventory } = useInventory();
   const [stats, setStats] = useState<DashboardStats>({
     totalStockAlerts: 0,
     pendingTransfers: 0,
@@ -28,7 +32,7 @@ const Dashboard: React.FC = () => {
     lowInventoryItems: 0
   });
 
-  // Mock data for demonstration
+  // Mock data for charts
   const mockInventoryData = [
     { name: 'Electronics', value: 400, color: '#0088FE' },
     { name: 'Clothing', value: 300, color: '#00C49F' },
@@ -47,14 +51,22 @@ const Dashboard: React.FC = () => {
   ];
 
   useEffect(() => {
-    // Simulate API call
-    setStats({
-      totalStockAlerts: 23,
-      pendingTransfers: 8,
-      todaySuggestions: 5,
-      lowInventoryItems: 12
+    // Calculate real stats from fetched data
+    const lowStockItems = inventory.filter(item => item.current_stock <= item.min_threshold);
+    const pendingSuggestions = suggestions.filter(s => s.status === 'pending');
+    const todaySuggestions = suggestions.filter(s => {
+      const today = new Date().toDateString();
+      const suggestionDate = new Date(s.created_at).toDateString();
+      return suggestionDate === today;
     });
-  }, []);
+
+    setStats({
+      totalStockAlerts: lowStockItems.length + pendingSuggestions.length,
+      pendingTransfers: 8, // This would come from transfer_requests table
+      todaySuggestions: todaySuggestions.length,
+      lowInventoryItems: lowStockItems.length
+    });
+  }, [suggestions, inventory]);
 
   const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
     <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -194,26 +206,29 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <h3 className="text-lg font-semibold mb-4">Recent AI Suggestions</h3>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <p className="font-medium">Transfer SKU-123</p>
-                <p className="text-sm text-gray-600">Warehouse A → Store B</p>
+            {suggestions.slice(0, 2).map((suggestion) => (
+              <div key={suggestion.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <p className="font-medium">{suggestion.sku}</p>
+                  <p className="text-sm text-gray-600">
+                    {suggestion.message}
+                  </p>
+                </div>
+                <div className="flex items-center">
+                  <span className={`text-sm px-2 py-1 rounded ${
+                    suggestion.priority === 'high' ? 'bg-red-100 text-red-800' :
+                    suggestion.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-green-100 text-green-800'
+                  }`}>
+                    {suggestion.priority}
+                  </span>
+                  <ArrowRight className="h-4 w-4 ml-2 text-gray-400" />
+                </div>
               </div>
-              <div className="flex items-center">
-                <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">High Priority</span>
-                <ArrowRight className="h-4 w-4 ml-2 text-gray-400" />
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <p className="font-medium">Restock Electronics</p>
-                <p className="text-sm text-gray-600">Store C needs 50 units</p>
-              </div>
-              <div className="flex items-center">
-                <span className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Medium</span>
-                <ArrowRight className="h-4 w-4 ml-2 text-gray-400" />
-              </div>
-            </div>
+            ))}
+            {suggestions.length === 0 && (
+              <p className="text-gray-500 text-center py-4">No recent suggestions</p>
+            )}
           </div>
         </div>
       </div>
