@@ -33,7 +33,14 @@ export const useInventory = (locationId?: string, locationType?: 'store' | 'ware
       const { data, error } = await query.order('product_name');
 
       if (error) throw error;
-      setInventory(data || []);
+      
+      // Type assertion to ensure location_type is properly typed
+      const typedData = (data || []).map(item => ({
+        ...item,
+        location_type: item.location_type as 'store' | 'warehouse'
+      }));
+      
+      setInventory(typedData);
     } catch (error) {
       console.error('Error fetching inventory:', error);
       toast.error('Failed to load inventory');

@@ -32,7 +32,18 @@ export const useSuggestions = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSuggestions(data || []);
+      
+      // Type assertion to ensure location types and other enums are properly typed
+      const typedData = (data || []).map(item => ({
+        ...item,
+        from_location_type: item.from_location_type as 'store' | 'warehouse',
+        to_location_type: item.to_location_type as 'store' | 'warehouse',
+        status: item.status as 'pending' | 'approved' | 'rejected',
+        priority: item.priority as 'high' | 'medium' | 'low',
+        suggested_by: item.suggested_by as 'ai' | 'manual'
+      }));
+      
+      setSuggestions(typedData);
     } catch (error) {
       console.error('Error fetching suggestions:', error);
       toast.error('Failed to load suggestions');
