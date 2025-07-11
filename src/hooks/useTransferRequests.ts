@@ -40,7 +40,14 @@ export const useTransferRequests = (locationId?: string, locationType?: 'store' 
 
       if (error) throw error;
       
-      setTransfers(data || []);
+      // Cast the data to match our interface types
+      const typedData = (data || []).map(item => ({
+        ...item,
+        from_location_type: item.from_location_type as 'store' | 'warehouse',
+        to_location_type: item.to_location_type as 'store' | 'warehouse'
+      })) as TransferRequest[];
+      
+      setTransfers(typedData);
     } catch (error) {
       console.error('Error fetching transfer requests:', error);
       toast.error('Failed to load transfer requests');

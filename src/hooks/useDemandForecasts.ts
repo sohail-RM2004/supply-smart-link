@@ -37,7 +37,13 @@ export const useDemandForecasts = (locationId?: string, locationType?: 'store' |
 
       if (error) throw error;
       
-      setForecasts(data || []);
+      // Cast the data to match our interface types
+      const typedData = (data || []).map(item => ({
+        ...item,
+        location_type: item.location_type as 'store' | 'warehouse'
+      })) as DemandForecast[];
+      
+      setForecasts(typedData);
     } catch (error) {
       console.error('Error fetching demand forecasts:', error);
       toast.error('Failed to load demand forecasts');
