@@ -1,234 +1,217 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  AlertTriangle, 
-  TrendingUp, 
-  Package, 
-  Clock,
-  Cloud,
-  Calendar,
-  ArrowRight
-} from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { useSuggestions } from '../hooks/useSuggestions';
+import { Package, TrendingUp, AlertTriangle, Building2, Warehouse, Users } from 'lucide-react';
 import { useInventory } from '../hooks/useInventory';
-
-interface DashboardStats {
-  totalStockAlerts: number;
-  pendingTransfers: number;
-  todaySuggestions: number;
-  lowInventoryItems: number;
-}
+import { useLocations } from '../hooks/useLocations';
+import { useSuggestions } from '../hooks/useSuggestions';
 
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
-  const { suggestions } = useSuggestions();
-  const { inventory } = useInventory();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalStockAlerts: 0,
-    pendingTransfers: 0,
-    todaySuggestions: 0,
-    lowInventoryItems: 0
-  });
+  const { inventory, loading: inventoryLoading } = useInventory();
+  const { stores, warehouses, loading: locationsLoading } = useLocations();
+  const { suggestions, loading: suggestionsLoading } = useSuggestions();
 
-  // Mock data for charts
-  const mockInventoryData = [
-    { name: 'Electronics', value: 400, color: '#0088FE' },
-    { name: 'Clothing', value: 300, color: '#00C49F' },
-    { name: 'Groceries', value: 300, color: '#FFBB28' },
-    { name: 'Home & Garden', value: 200, color: '#FF8042' },
-  ];
+  const totalInventory = inventory.reduce((sum, item) => sum + item.current_stock, 0);
+  const lowStockItems = inventory.filter(item => item.current_stock <= item.min_threshold);
+  const pendingSuggestions = suggestions.filter(s => s.status === 'pending');
 
-  const mockTransferData = [
-    { day: 'Mon', transfers: 12 },
-    { day: 'Tue', transfers: 19 },
-    { day: 'Wed', transfers: 8 },
-    { day: 'Thu', transfers: 15 },
-    { day: 'Fri', transfers: 22 },
-    { day: 'Sat', transfers: 18 },
-    { day: 'Sun', transfers: 10 },
-  ];
-
-  useEffect(() => {
-    // Calculate real stats from fetched data
-    const lowStockItems = inventory.filter(item => item.current_stock <= item.min_threshold);
-    const pendingSuggestions = suggestions.filter(s => s.status === 'pending');
-    const todaySuggestions = suggestions.filter(s => {
-      const today = new Date().toDateString();
-      const suggestionDate = new Date(s.created_at).toDateString();
-      return suggestionDate === today;
-    });
-
-    setStats({
-      totalStockAlerts: lowStockItems.length + pendingSuggestions.length,
-      pendingTransfers: 8, // This would come from transfer_requests table
-      todaySuggestions: todaySuggestions.length,
-      lowInventoryItems: lowStockItems.length
-    });
-  }, [suggestions, inventory]);
-
-  const StatCard = ({ title, value, icon: Icon, color, trend }: any) => (
-    <div className="bg-white p-6 rounded-lg shadow-sm border">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {trend && (
-            <p className="text-sm text-green-600 flex items-center mt-1">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              {trend}
-            </p>
-          )}
-        </div>
-        <div className={`p-3 rounded-full ${color}`}>
-          <Icon className="h-6 w-6 text-white" />
-        </div>
+  if (inventoryLoading || locationsLoading || suggestionsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  const getLocationSpecificStats = () => {
+    if (profile?.role === 'store_manager' && profile.linked_store_id) {
+      const storeInventory = inventory.filter(item => 
+        item.location_type === 'store' && item.location_id === profile.linked_store_id
+      );
+      return {
+        title: 'My Store Overview',
+        totalItems: storeInventory.reduce((sum, item) => sum + item.current_stock, 0),
+        lowStock: storeInventory.filter(item => item.current_stock <= item.min_threshold).length,
+        location: stores.find(s => s.id === profile.linked_store_id)?.name || 'Store'
+      };
+    } else if (profile?.role === 'warehouse_manager' && profile.linked_warehouse_id) {
+      const warehouseInventory = inventory.filter(item => 
+        item.location_type === 'warehouse' && item.location_id === profile.linked_warehouse_id
+      );
+      return {
+        title: 'My Warehouse Overview',
+        totalItems: warehouseInventory.reduce((sum, item) => sum + item.current_stock, 0),
+        lowStock: warehouseInventory.filter(item => item.current_stock <= item.min_threshold).length,
+        location: warehouses.find(w => w.id === profile.linked_warehouse_id)?.name || 'Warehouse'
+      };
+    }
+    return {
+      title: 'System Overview',
+      totalItems: totalInventory,
+      lowStock: lowStockItems.length,
+      location: 'All Locations'
+    };
+  };
+
+  const locationStats = getLocationSpecificStats();
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-lg">
-        <h1 className="text-2xl font-bold mb-2">
-          Welcome back, {profile?.role?.replace('_', ' ')}!
+    <div className="space-y-6">
+      {/* Welcome Header */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Welcome to NeuraChain
         </h1>
-        <p className="text-blue-100">
-          Here's your supply chain overview for today
+        <p className="text-gray-600">
+          {locationStats.title} • {locationStats.location}
         </p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Stock Alerts"
-          value={stats.totalStockAlerts}
-          icon={AlertTriangle}
-          color="bg-red-500"
-          trend="+12% from last week"
-        />
-        <StatCard
-          title="Pending Transfers"
-          value={stats.pendingTransfers}
-          icon={Package}
-          color="bg-blue-500"
-          trend="-5% from yesterday"
-        />
-        <StatCard
-          title="Today's Suggestions"
-          value={stats.todaySuggestions}
-          icon={TrendingUp}
-          color="bg-green-500"
-          trend="+8% efficiency"
-        />
-        <StatCard
-          title="Low Inventory Items"
-          value={stats.lowInventoryItems}
-          icon={Clock}
-          color="bg-orange-500"
-          trend="Needs attention"
-        />
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Transfer Trends */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-semibold mb-4">Weekly Transfer Activity</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={mockTransferData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="transfers" fill="#3B82F6" />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Inventory</p>
+              <p className="text-2xl font-bold text-gray-900">{locationStats.totalItems}</p>
+            </div>
+            <Package className="h-8 w-8 text-blue-500" />
+          </div>
         </div>
-
-        {/* Inventory Distribution */}
+        
         <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-semibold mb-4">Inventory Distribution</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={mockInventoryData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {mockInventoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Low Stock Alerts</p>
+              <p className="text-2xl font-bold text-red-600">{locationStats.lowStock}</p>
+            </div>
+            <AlertTriangle className="h-8 w-8 text-red-500" />
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Pending Suggestions</p>
+              <p className="text-2xl font-bold text-yellow-600">{pendingSuggestions.length}</p>
+            </div>
+            <TrendingUp className="h-8 w-8 text-yellow-500" />
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Locations</p>
+              <p className="text-2xl font-bold text-green-600">{stores.length + warehouses.length}</p>
+            </div>
+            <Building2 className="h-8 w-8 text-green-500" />
+          </div>
         </div>
       </div>
 
-      {/* Recent Activities */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Weather & Events */}
+      {/* Recent Inventory Items */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <h3 className="text-lg font-semibold mb-4">Recent Inventory</h3>
+        {inventory.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Product
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    SKU
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Current Stock
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Location
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {inventory.slice(0, 5).map((item) => {
+                  const isLowStock = item.current_stock <= item.min_threshold;
+                  return (
+                    <tr key={item.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {item.product_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {item.sku}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {item.current_stock}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
+                        {item.location_type}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          isLowStock 
+                            ? 'bg-red-100 text-red-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {isLowStock ? 'Low Stock' : 'Good'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-gray-500 text-center py-8">No inventory data available</p>
+        )}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <Cloud className="h-5 w-5 mr-2 text-blue-500" />
-            Weather & Events Impact
+            <Building2 className="h-5 w-5 mr-2 text-blue-500" />
+            Stores
           </h3>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-              <div>
-                <p className="font-medium">Sunny Weather</p>
-                <p className="text-sm text-gray-600">Increased outdoor equipment demand</p>
-              </div>
-              <span className="text-green-600 font-semibold">+15%</span>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-              <div className="flex items-center">
-                <Calendar className="h-4 w-4 mr-2 text-orange-500" />
+            {stores.slice(0, 3).map((store) => (
+              <div key={store.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                 <div>
-                  <p className="font-medium">Holiday Weekend</p>
-                  <p className="text-sm text-gray-600">Expected surge in grocery sales</p>
+                  <p className="font-medium">{store.name}</p>
+                  <p className="text-sm text-gray-600">{store.location}</p>
                 </div>
+                <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                  Store
+                </span>
               </div>
-              <span className="text-orange-600 font-semibold">+25%</span>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Recent Suggestions */}
         <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <h3 className="text-lg font-semibold mb-4">Recent AI Suggestions</h3>
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Warehouse className="h-5 w-5 mr-2 text-green-500" />
+            Warehouses
+          </h3>
           <div className="space-y-3">
-            {suggestions.slice(0, 2).map((suggestion) => (
-              <div key={suggestion.id} className="flex items-center justify-between p-3 border rounded-lg">
+            {warehouses.slice(0, 3).map((warehouse) => (
+              <div key={warehouse.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                 <div>
-                  <p className="font-medium">{suggestion.sku}</p>
-                  <p className="text-sm text-gray-600">
-                    {suggestion.message}
-                  </p>
+                  <p className="font-medium">{warehouse.name}</p>
+                  <p className="text-sm text-gray-600">{warehouse.location}</p>
                 </div>
-                <div className="flex items-center">
-                  <span className={`text-sm px-2 py-1 rounded ${
-                    suggestion.priority === 'high' ? 'bg-red-100 text-red-800' :
-                    suggestion.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
-                    {suggestion.priority}
-                  </span>
-                  <ArrowRight className="h-4 w-4 ml-2 text-gray-400" />
-                </div>
+                <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
+                  Warehouse
+                </span>
               </div>
             ))}
-            {suggestions.length === 0 && (
-              <p className="text-gray-500 text-center py-4">No recent suggestions</p>
-            )}
           </div>
         </div>
       </div>

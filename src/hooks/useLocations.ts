@@ -31,24 +31,40 @@ export const useLocations = () => {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchLocations = async () => {
+  const fetchStores = async () => {
     try {
-      const [storesResult, warehousesResult] = await Promise.all([
-        supabase.from('stores').select('*').order('name'),
-        supabase.from('warehouses').select('*').order('name')
-      ]);
+      const { data, error } = await supabase
+        .from('stores')
+        .select('*')
+        .order('name');
 
-      if (storesResult.error) throw storesResult.error;
-      if (warehousesResult.error) throw warehousesResult.error;
-
-      setStores(storesResult.data || []);
-      setWarehouses(warehousesResult.data || []);
+      if (error) throw error;
+      setStores(data || []);
     } catch (error) {
-      console.error('Error fetching locations:', error);
-      toast.error('Failed to load locations');
-    } finally {
-      setLoading(false);
+      console.error('Error fetching stores:', error);
+      toast.error('Failed to load stores');
     }
+  };
+
+  const fetchWarehouses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('warehouses')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setWarehouses(data || []);
+    } catch (error) {
+      console.error('Error fetching warehouses:', error);
+      toast.error('Failed to load warehouses');
+    }
+  };
+
+  const fetchLocations = async () => {
+    setLoading(true);
+    await Promise.all([fetchStores(), fetchWarehouses()]);
+    setLoading(false);
   };
 
   useEffect(() => {

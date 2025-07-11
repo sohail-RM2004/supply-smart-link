@@ -24,6 +24,8 @@ export const useInventory = (locationId?: string, locationType?: 'store' | 'ware
 
   const fetchInventory = async () => {
     try {
+      console.log('Fetching inventory data...', { locationId, locationType });
+      
       let query = supabase.from('inventory').select('*');
       
       if (locationId && locationType) {
@@ -32,7 +34,12 @@ export const useInventory = (locationId?: string, locationType?: 'store' | 'ware
       
       const { data, error } = await query.order('product_name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Inventory fetch error:', error);
+        throw error;
+      }
+      
+      console.log('Inventory data fetched:', data);
       
       // Type assertion to ensure location_type is properly typed
       const typedData = (data || []).map(item => ({
@@ -63,6 +70,7 @@ export const useInventory = (locationId?: string, locationType?: 'store' | 'ware
           table: 'inventory'
         },
         () => {
+          console.log('Inventory data changed, refetching...');
           fetchInventory();
         }
       )
