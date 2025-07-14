@@ -38,7 +38,7 @@ const Admin: React.FC = () => {
         body: JSON.stringify({
           trigger: 'manual_forecast',
           timestamp: new Date().toISOString(),
-          source: 'neurachain_admin'
+          source: 'chainpilot_admin'
         }),
       });
 

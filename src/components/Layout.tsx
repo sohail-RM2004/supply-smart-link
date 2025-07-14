@@ -54,7 +54,7 @@ const Layout: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <BarChart3 className="h-8 w-8 text-blue-600 mr-3" />
-              <h1 className="text-xl font-bold text-gray-900">NeuraChain</h1>
+              <h1 className="text-xl font-bold text-gray-900">ChainPilot</h1>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">

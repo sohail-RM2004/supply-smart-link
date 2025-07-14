@@ -61,7 +61,7 @@ const Dashboard: React.FC = () => {
       {/* Welcome Header */}
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Welcome to NeuraChain
+          Welcome to ChainPilot
         </h1>
         <p className="text-gray-600">
           {locationStats.title} • {locationStats.location}

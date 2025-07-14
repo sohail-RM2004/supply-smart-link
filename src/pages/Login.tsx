@@ -51,7 +51,7 @@ const Login: React.FC = () => {
           <div className="flex justify-center">
             <BarChart3 className="h-12 w-12 text-blue-600" />
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">NeuraChain</h2>
+          <h2 className="mt-6 text-3xl font-bold text-gray-900">ChainPilot</h2>
           <p className="mt-2 text-sm text-gray-600">
             Smart Supply Chain Optimization
           </p>
